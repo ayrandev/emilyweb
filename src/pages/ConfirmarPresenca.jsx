@@ -544,7 +544,7 @@ export default function ConfirmarPresenca() {
               </div>
             )}
 
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <Button
                 variant="primary"
                 onClick={() => setShowCheckoutModal(true)}
@@ -552,6 +552,20 @@ export default function ConfirmarPresenca() {
               >
                 Concluir Confirmação
               </Button>
+              
+              {!selectedGiftId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadCard();
+                    navigate('/');
+                  }}
+                  className="w-full py-3 text-xs text-[#6b5880] font-bold hover:text-[#4a3e56] border border-dashed border-lilas-medium/40 hover:border-lilas-medium rounded-2xl bg-white/40 hover:bg-lilas-soft/20 transition-all flex items-center justify-center gap-1.5 active:scale-98"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#8b7d99]" />
+                  Apenas Baixar Cartão (Sem Presente)
+                </button>
+              )}
             </div>
           </div>
         )}
