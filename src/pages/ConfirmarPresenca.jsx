@@ -667,6 +667,18 @@ export default function ConfirmarPresenca() {
                   <Download className="w-4 h-4" />
                   Baixar Cartão de Confirmação
                 </Button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCheckoutModal(false);
+                    setStep('gifts');
+                  }}
+                  className="w-full py-2.5 text-xs text-[#6b3040] font-bold hover:underline bg-[#faf6fe] border border-lilas-medium/30 rounded-xl transition-all"
+                >
+                  🎁 Ver Sugestão de Presentes
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
