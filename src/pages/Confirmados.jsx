@@ -208,7 +208,7 @@ export default function Confirmados() {
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Adultos (Pagantes)</p>
+              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Adultos</p>
               <h3 className="text-2xl font-bold text-[#4a3e56]">{totalAdultos}</h3>
               <p className="text-[10px] text-[#8b7d99] mt-0.5 font-medium">Acima de 6 anos</p>
             </div>
@@ -219,7 +219,7 @@ export default function Confirmados() {
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Crianças (Isentas)</p>
+              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Crianças</p>
               <h3 className="text-2xl font-bold text-[#4a3e56]">{totalCriancas}</h3>
               <p className="text-[10px] text-[#8b7d99] mt-0.5 font-medium">Menores de 6 anos</p>
             </div>
@@ -343,7 +343,7 @@ export default function Confirmados() {
                                 <li key={idx} className="flex items-center gap-1.5 justify-between">
                                   <span>• {name}</span>
                                   {isChild && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-azul-baby/45 text-[#2c5364] flex items-center gap-0.5" title="Isento no buffet (Menor de 6 anos)">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-azul-baby/45 text-[#2c5364] flex items-center gap-0.5" title="Menor de 6 anos">
                                       👶 Criança
                                     </span>
                                   )}

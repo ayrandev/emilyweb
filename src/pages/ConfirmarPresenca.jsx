@@ -286,7 +286,7 @@ export default function ConfirmarPresenca() {
                             onChange={(e) => handleAcompanhanteChange(index, 'isChild', e.target.checked)}
                             className="w-3.5 h-3.5 rounded border-gray-300 text-[#8b4f60] focus:ring-[#8b4f60] accent-rosa-baby"
                           />
-                          <span>Menor de 6 anos (Criança - não pagante no buffet)</span>
+                          <span>Menor de 6 anos (criança)</span>
                         </label>
                       </div>
                     ))}
