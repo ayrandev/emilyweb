@@ -32,6 +32,17 @@ export default function ConfirmarPresenca() {
   // Lista de presentes
   const [gifts, setGifts] = useState([]);
   const [selectedGiftId, setSelectedGiftId] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+
+  // Auto-fechamento do Toast de notificação
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
 
   // Carrega presentes do localStorage na montagem
   useEffect(() => {
@@ -111,6 +122,7 @@ export default function ConfirmarPresenca() {
     
     // Ir para tela de sucesso intermediária
     setStep('success');
+    setShowToast(true);
   };
 
   const handleReserveGift = (giftId) => {
@@ -407,6 +419,16 @@ export default function ConfirmarPresenca() {
         )}
 
       </div>
+
+      {/* Toast de Notificação de Sucesso */}
+      {showToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-6 py-4 rounded-2xl bg-verde-baby border border-[#b8f5b8]/80 text-[#2d5a2d] shadow-md animate-slide-down max-w-sm w-[90vw] text-left">
+          <CheckCircle2 className="w-5 h-5 text-[#2d5a2d] shrink-0" />
+          <div className="text-xs font-semibold leading-snug">
+            Presença confirmada! Muito obrigado por celebrar o 1º aninho da Emily Maria conosco! 💖
+          </div>
+        </div>
+      )}
 
       {/* Direitos Autorais */}
       <div className="relative z-10 mt-8 text-[10px] text-[#8b7d99] font-semibold tracking-wider uppercase opacity-85">

@@ -16,6 +16,7 @@
   --animate-float-slow: float-slow 8s ease-in-out infinite;
   --animate-sway: sway 8s ease-in-out infinite;
   --animate-kenburns: kenburns 6s ease-out forwards;
+  --animate-slide-down: slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   
   @keyframes float {
     0%, 100% { transform: translateY(0); }
@@ -32,6 +33,10 @@
   @keyframes kenburns {
     0% { transform: scale(1); }
     100% { transform: scale(1.08); }
+  }
+  @keyframes slide-down {
+    0% { transform: translate(-50%, -20px); opacity: 0; }
+    100% { transform: translate(-50%, 0); opacity: 1; }
   }
 }
 
