@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import FloatingButterflies from '../components/FloatingButterflies';
-import { User, Phone, Mail, Plus, Trash2, CheckCircle2, Gift, Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
+import { User, Phone, Mail, Plus, Trash2, CheckCircle2, Gift, Sparkles, ArrowRight, ArrowLeft, Download } from 'lucide-react';
 
 const DEFAULT_GIFTS = [
   { 
@@ -46,6 +46,7 @@ export default function ConfirmarPresenca() {
   // Lista de presentes e seleção
   const [selectedGiftId, setSelectedGiftId] = useState(null);
   const [showToast, setShowToast] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
   // Auto-fechamento do Toast de notificação
   useEffect(() => {
@@ -182,6 +183,93 @@ export default function ConfirmarPresenca() {
     }
 
     localStorage.setItem('party_guests', JSON.stringify(guestsList));
+  };
+
+  const handleDownloadCard = () => {
+    const currentGuestId = localStorage.getItem('current_guest_id');
+    const savedGuests = localStorage.getItem('party_guests');
+    if (!currentGuestId || !savedGuests) return;
+
+    const guestsList = JSON.parse(savedGuests);
+    const guest = guestsList.find(g => g.id === currentGuestId);
+    if (!guest) return;
+
+    const acompListHtml = guest.acompanhantes && guest.acompanhantes.length > 0
+      ? `<div class="section">
+          <div class="section-title">Acompanhantes</div>
+          <div class="content" style="font-size: 13px;">
+            ${guest.acompanhantes.map(a => `
+              <div class="acomp-item" style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <span>• ${a.name}</span>
+                ${a.isChild ? `<span class="acomp-child" style="font-size: 10px; background: #d4f0fc; color: #2c5364; padding: 1px 6px; border-radius: 8px; font-weight: bold;">Criança</span>` : ''}
+              </div>
+            `).join('')}
+          </div>
+         </div>`
+      : '';
+
+    const giftText = guest.reservedGift 
+      ? guest.reservedGift 
+      : 'Nenhuma sugestão marcada (Livre)';
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cartão de Confirmação - Emily Maria</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #faf6fe; color: #4a3e56; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+    .card { background: white; border: 3px dashed #c084fc; border-radius: 24px; padding: 30px; max-width: 400px; width: 100%; box-shadow: 0 10px 25px rgba(107, 88, 128, 0.15); text-align: center; position: relative; }
+    .card::before { content: '🦋'; font-size: 24px; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: #faf6fe; padding: 0 10px; }
+    h1 { font-family: Georgia, serif; color: #6b3040; margin-bottom: 5px; font-size: 24px; }
+    .tag { display: inline-block; background: #ffd1dc; color: #8b4f60; font-size: 10px; font-weight: bold; text-transform: uppercase; padding: 4px 10px; border-radius: 12px; margin-bottom: 20px; }
+    .section { border-top: 1px solid #eee; padding: 15px 0; text-align: left; }
+    .section-title { font-size: 11px; font-weight: bold; color: #8b7d99; text-transform: uppercase; margin-bottom: 6px; }
+    .content { font-size: 14px; font-weight: 600; color: #4a3e56; }
+    .footer-info { font-size: 11px; color: #8b7d99; font-style: italic; margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Jardim Encantado</h1>
+    <div class="tag">🌸 Emily Maria - 1º Aninho 🌸</div>
+    
+    <div class="section">
+      <div class="section-title">Convidado Responsável</div>
+      <div class="content">${guest.chefe}</div>
+    </div>
+    
+    ${acompListHtml}
+    
+    <div class="section">
+      <div class="section-title">Presente Escolhido</div>
+      <div class="content">${giftText}</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Detalhes do Evento</div>
+      <div class="content" style="font-size: 13px;">
+        📅 Sábado, 29 de Agosto às 17h<br>
+        📍 Lalu Eventos<br>
+        🗺️ Av. Bernardo Manuel, 12.982
+      </div>
+    </div>
+    
+    <div class="footer-info">
+      Apresente este cartão digital na entrada do evento. Esperamos por você! ✨
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", URL.createObjectURL(blob));
+    downloadAnchor.setAttribute("download", `confirmacao_emily_maria_${guest.chefe.toLowerCase().replace(/[^a-z0-9]/g, '_')}.html`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
   return (
@@ -459,7 +547,7 @@ export default function ConfirmarPresenca() {
             <div className="pt-2">
               <Button
                 variant="primary"
-                onClick={() => navigate('/')}
+                onClick={() => setShowCheckoutModal(true)}
                 className="w-full py-4 text-base bg-gradient-to-r from-rosa-baby to-azul-baby text-[#3b4a7a] font-bold shadow-md hover:scale-[1.02] transition-all"
               >
                 Concluir Confirmação
@@ -479,6 +567,98 @@ export default function ConfirmarPresenca() {
           </div>
         </div>
       )}
+
+      {/* Modal de Checkout / Cartão de Confirmação */}
+      {showCheckoutModal && (() => {
+        const currentGuestId = localStorage.getItem('current_guest_id');
+        const savedGuests = localStorage.getItem('party_guests');
+        if (!currentGuestId || !savedGuests) return null;
+        
+        const guestsList = JSON.parse(savedGuests);
+        const guest = guestsList.find(g => g.id === currentGuestId);
+        if (!guest) return null;
+
+        const giftText = guest.reservedGift ? guest.reservedGift : 'Nenhuma sugestão marcada (Livre)';
+
+        return (
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="w-full max-w-md bg-white rounded-3xl border border-lilas-medium/50 p-6 shadow-2xl relative animate-scaleUp text-center space-y-5">
+              
+              <div>
+                <span className="text-[10px] font-bold text-[#8b4f60] uppercase tracking-wider bg-rosa-baby/40 px-3 py-1 rounded-full">
+                  Confirmação Concluída
+                </span>
+                <h3 className="font-display text-3xl text-[#6b3040] mt-3">Seu Cartão Digital</h3>
+                <p className="text-[10px] text-[#8b7d99] mt-0.5">
+                  Veja a prévia do seu bilhete de confirmação abaixo.
+                </p>
+              </div>
+
+              {/* Bilhete estilizado */}
+              <div className="relative border-2 border-dashed border-[#c084fc]/40 rounded-2xl p-4 bg-[#faf6fe]/60 text-left space-y-3.5 shadow-inner overflow-hidden">
+                <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-white border border-[#c084fc]/15"></div>
+                <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-white border border-[#c084fc]/15"></div>
+                
+                <div>
+                  <h4 className="text-[9px] font-bold text-[#8b7d99] uppercase tracking-wider">Responsável</h4>
+                  <p className="text-sm font-bold text-[#4a3e56] mt-0.5">{guest.chefe}</p>
+                </div>
+
+                {guest.acompanhantes && guest.acompanhantes.length > 0 && (
+                  <div>
+                    <h4 className="text-[9px] font-bold text-[#8b7d99] uppercase tracking-wider">Acompanhantes</h4>
+                    <ul className="text-xs text-[#6b5880] mt-1 space-y-1">
+                      {guest.acompanhantes.map((acomp, idx) => (
+                        <li key={idx} className="flex justify-between items-center bg-white/50 px-2 py-0.5 rounded-lg border border-lilas-medium/10">
+                          <span>• {acomp.name}</span>
+                          {acomp.isChild && (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-azul-baby/40 text-[#2c5364]">
+                              👶 Criança
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="border-t border-[#c084fc]/20 pt-2.5">
+                  <h4 className="text-[9px] font-bold text-[#8b7d99] uppercase tracking-wider">Sugestão de Presente</h4>
+                  <p className="text-xs font-bold text-[#2e7d32] mt-0.5 leading-snug">{giftText}</p>
+                </div>
+
+                <div className="border-t border-dashed border-[#c084fc]/20 pt-2.5 text-[10px] text-[#6b5880] space-y-0.5">
+                  <p>📅 <strong>Sábado, 29 de Agosto</strong> às <strong>17h</strong></p>
+                  <p>📍 <strong>Lalu Eventos</strong> (Av. Bernardo Manuel, 12.982)</p>
+                </div>
+              </div>
+
+              {/* Botões */}
+              <div className="flex flex-col gap-2 pt-1.5">
+                <Button
+                  variant="primary"
+                  onClick={handleDownloadCard}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-rosa-baby to-[#ffc0cb] text-[#6b3040] font-bold shadow-md hover:scale-[1.02] transition-all"
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar Cartão de Confirmação
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCheckoutModal(false);
+                    navigate('/');
+                  }}
+                  className="w-full py-2.5 text-xs text-[#8b7d99] font-bold hover:underline"
+                >
+                  Concluir e Fechar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Direitos Autorais */}
       <div className="relative z-10 mt-8 text-[10px] text-[#8b7d99] font-semibold tracking-wider uppercase opacity-85">
