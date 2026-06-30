@@ -5,35 +5,32 @@ import Input from '../components/Input';
 import FloatingButterflies from '../components/FloatingButterflies';
 import { User, Phone, Mail, Plus, Trash2, CheckCircle2, Gift, Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
 
-const generateInitialGifts = () => {
-  const list = [];
-  for (let i = 1; i <= 100; i++) {
-    let name = '';
-    let category = '';
-    
-    if (i >= 1 && i <= 20) {
-      name = 'Roupinha de 1 a 2 anos, Sapato (Tam: 20 a 22) ou Brinquedo Educativo';
-      category = 'Tamanho 1 a 2 anos';
-    } else if (i >= 21 && i <= 50) {
-      name = 'Roupinha de 2 anos, Sapato (Tam: 22) ou Brinquedo Educativo';
-      category = 'Tamanho 2 anos';
-    } else if (i >= 51 && i <= 80) {
-      name = 'Roupinha de 2 a 3 anos, Sapato (Tam: 22 a 24) ou Brinquedo Educativo';
-      category = 'Tamanho 2 a 3 anos';
-    } else {
-      name = 'Roupinha de 3 anos, Sapato (Tam: 23) ou Brinquedo Educativo';
-      category = 'Tamanho 3 anos';
-    }
-    
-    list.push({
-      id: i,
-      name: name,
-      category: category,
-      reservedBy: null
-    });
+const DEFAULT_GIFTS = [
+  { 
+    id: 1, 
+    name: 'Roupinha de 1 a 2 anos, Sapato (Tam: 20 a 22) ou Brinquedos Educativos', 
+    limit: 20,
+    category: 'Tamanho 1 a 2 anos' 
+  },
+  { 
+    id: 2, 
+    name: 'Roupinha de 2 anos, Sapato (Tam: 22) ou Brinquedos Educativos', 
+    limit: 30,
+    category: 'Tamanho 2 anos' 
+  },
+  { 
+    id: 3, 
+    name: 'Roupinha de 2 a 3 anos, Sapato (Tam: 22 a 24) ou Brinquedos Educativos', 
+    limit: 30,
+    category: 'Tamanho 2 a 3 anos' 
+  },
+  { 
+    id: 4, 
+    name: 'Roupinha de 3 anos, Sapato (Tam: 23) ou Brinquedos Educativos', 
+    limit: 20,
+    category: 'Tamanho 3 anos' 
   }
-  return list;
-};
+];
 
 export default function ConfirmarPresenca() {
   const navigate = useNavigate();
@@ -46,10 +43,8 @@ export default function ConfirmarPresenca() {
   const [acompanhantes, setAcompanhantes] = useState([]); // Array de strings (nomes)
   const [errors, setErrors] = useState({});
 
-  // Lista de presentes
-  const [gifts, setGifts] = useState([]);
+  // Lista de presentes e seleção
   const [selectedGiftId, setSelectedGiftId] = useState(null);
-  const [activeGiftId, setActiveGiftId] = useState(1); // Presente ativo selecionado no grid
   const [showToast, setShowToast] = useState(false);
 
   // Auto-fechamento do Toast de notificação
@@ -62,17 +57,20 @@ export default function ConfirmarPresenca() {
     }
   }, [showToast]);
 
-  // Carrega presentes do localStorage na montagem
+  // Carrega a escolha anterior do usuário se existir no localStorage
   useEffect(() => {
-    const savedGifts = localStorage.getItem('party_gifts');
-    if (savedGifts && JSON.parse(savedGifts).length === 100) {
-      setGifts(JSON.parse(savedGifts));
-    } else {
-      const initialGifts = generateInitialGifts();
-      localStorage.setItem('party_gifts', JSON.stringify(initialGifts));
-      setGifts(initialGifts);
+    if (step === 'gifts') {
+      const currentGuestId = localStorage.getItem('current_guest_id');
+      const savedGuests = localStorage.getItem('party_guests');
+      if (currentGuestId && savedGuests) {
+        const guestsList = JSON.parse(savedGuests);
+        const currentGuest = guestsList.find(g => g.id === currentGuestId);
+        if (currentGuest && currentGuest.reservedGiftId) {
+          setSelectedGiftId(currentGuest.reservedGiftId);
+        }
+      }
     }
-  }, []);
+  }, [step]);
 
   const addAcompanhante = () => {
     if (acompanhantes.length < 4) {
@@ -83,6 +81,13 @@ export default function ConfirmarPresenca() {
   const removeAcompanhante = (index) => {
     const newAcompanhantes = acompanhantes.filter((_, i) => i !== index);
     setAcompanhantes(newAcompanhantes);
+  };
+
+  const getGiftReservationsCount = (giftId) => {
+    const savedGuests = localStorage.getItem('party_guests');
+    if (!savedGuests) return 0;
+    const guestsList = JSON.parse(savedGuests);
+    return guestsList.filter(g => g.reservedGiftId === giftId).length;
   };
 
   const handleAcompanhanteChange = (index, value) => {
@@ -150,41 +155,31 @@ export default function ConfirmarPresenca() {
     const guestsList = savedGuests ? JSON.parse(savedGuests) : [];
     const guestIndex = guestsList.findIndex(g => g.id === currentGuestId);
     
-    let isRemoving = false;
+    if (guestIndex === -1) return;
 
-    const updatedGifts = gifts.map(gift => {
-      if (gift.id === giftId) {
-        if (gift.reservedBy === chefe) {
-          isRemoving = true;
-          return { ...gift, reservedBy: null };
-        }
-        if (gift.reservedBy) return gift;
-        return { ...gift, reservedBy: chefe };
-      }
-      if (gift.reservedBy === chefe) {
-        return { ...gift, reservedBy: null };
-      }
-      return gift;
-    });
+    const isRemoving = selectedGiftId === giftId;
+    const selectedGift = DEFAULT_GIFTS.find(g => g.id === giftId);
 
-    localStorage.setItem('party_gifts', JSON.stringify(updatedGifts));
-    setGifts(updatedGifts);
-    
+    if (!isRemoving && selectedGift) {
+      // Contar quantas reservas esse presente já tem no total
+      const reservationsCount = guestsList.filter(g => g.reservedGiftId === giftId).length;
+      if (reservationsCount >= selectedGift.limit) {
+        alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações. Por favor, escolha outra opção!`);
+        return;
+      }
+    }
+
     if (isRemoving) {
+      guestsList[guestIndex].reservedGiftId = null;
+      guestsList[guestIndex].reservedGift = null;
       setSelectedGiftId(null);
     } else {
+      guestsList[guestIndex].reservedGiftId = giftId;
+      guestsList[guestIndex].reservedGift = selectedGift ? selectedGift.name : null;
       setSelectedGiftId(giftId);
     }
 
-    if (guestIndex !== -1) {
-      if (isRemoving) {
-        guestsList[guestIndex].reservedGift = null;
-      } else {
-        const selectedGift = updatedGifts.find(g => g.id === giftId);
-        guestsList[guestIndex].reservedGift = selectedGift ? `Nº ${selectedGift.id} - ${selectedGift.name}` : null;
-      }
-      localStorage.setItem('party_guests', JSON.stringify(guestsList));
-    }
+    localStorage.setItem('party_guests', JSON.stringify(guestsList));
   };
 
   return (
@@ -365,134 +360,79 @@ export default function ConfirmarPresenca() {
               <span className="text-xs font-bold text-[#5b6a9a] uppercase tracking-wider bg-azul-baby/40 px-3 py-1 rounded-full">
                 Passo 2 de 2
               </span>
-              <h2 className="font-display text-4xl text-[#3b4a7a] mt-3">Sugestões de Presentes</h2>
+              <h2 className="font-display text-4xl text-[#3b4a7a] mt-3">Sugestão de Presentes</h2>
               <p className="text-xs text-[#6b5880] mt-2 max-w-xs mx-auto">
-                Para facilitar, criamos uma listinha com algumas sugestões que a Emily Maria vai amar. Sinta-se livre para escolher um item para reservar!
+                Para facilitar, disponibilizamos as opções e tamanhos sugeridos abaixo. Escolha um item para fazer a sua marcação!
               </p>
             </div>
 
-            {/* Legenda de Cores das Faixas de Tamanho */}
-            <div className="p-3 rounded-2xl bg-lilas-soft/20 border border-lilas-medium/30 space-y-2 text-left">
-              <h4 className="text-[10px] font-bold text-[#6b5880] uppercase tracking-wider">Tamanhos de Presentes</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] font-semibold text-[#6b5880]">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-[#ffd1dc] border border-pink-200"></span>
-                  <span>1 a 20: 1-2 anos (Sapato 20-22)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-[#d4f0fc] border border-blue-200"></span>
-                  <span>21 a 50: 2 anos (Sapato 22)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-[#e8d7fa] border border-purple-200"></span>
-                  <span>51 a 80: 2-3 anos (Sapato 22-24)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-[#d2f8d2] border border-green-200"></span>
-                  <span>81 a 100: 3 anos (Sapato 23)</span>
-                </div>
-              </div>
-            </div>
+            {/* Listagem de Presentes Simples com Limites */}
+            <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1 scrollbar-thin text-left">
+              {DEFAULT_GIFTS.map((gift) => {
+                const count = getGiftReservationsCount(gift.id);
+                const isSelectedByMe = selectedGiftId === gift.id;
+                const isLimitReached = count >= gift.limit;
+                const isReservedByAnother = selectedGiftId !== null && !isSelectedByMe;
 
-            {/* Grid de Números de 1 a 100 */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-[#6b5880] flex justify-between pl-1">
-                <span>Escolha um número de presente</span>
-                <span className="text-[10px] text-[#8b7d99] font-medium">Toque para selecionar</span>
-              </label>
-              
-              <div className="grid grid-cols-10 gap-1 p-2 bg-lilas-soft/10 rounded-2xl border border-lilas-medium/30 max-h-48 overflow-y-auto scrollbar-thin">
-                {gifts.map((gift) => {
-                  const num = gift.id;
-                  const isReserved = gift.reservedBy !== null;
-                  const isReservedByMe = gift.reservedBy === chefe;
-                  const isActive = num === activeGiftId;
+                return (
+                  <div
+                    key={gift.id}
+                    className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col justify-between gap-3 ${
+                      isSelectedByMe
+                        ? 'bg-verde-baby/20 border-verde-baby/60 shadow-xs'
+                        : isLimitReached
+                        ? 'bg-gray-50 border-gray-200/50 opacity-60'
+                        : 'bg-white border-lilas-medium/30 hover:border-lilas-medium hover:shadow-xxs'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <span className="text-[9px] uppercase tracking-wider font-bold text-[#8b7d99] bg-lilas-soft/50 px-2.5 py-0.5 rounded-md">
+                          {gift.category}
+                        </span>
+                        <span className={`text-[10px] font-bold ${
+                          isLimitReached ? 'text-red-400' : 'text-[#6b5880]'
+                        }`}>
+                          Escolhas: {count} de {gift.limit}
+                        </span>
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-bold text-[#4a3e56] mt-2.5 leading-snug">
+                        {gift.name}
+                      </h4>
+                    </div>
 
-                  // Definir cor de fundo com base no número
-                  let bgStyle = 'bg-white border-lilas-medium text-[#4a3e56] hover:bg-lilas-soft';
-                  if (isReservedByMe) {
-                    bgStyle = 'bg-green-500 text-white border-green-600 shadow-inner';
-                  } else if (isReserved) {
-                    bgStyle = 'bg-gray-100 text-gray-300 border-gray-200/50 cursor-not-allowed line-through opacity-55';
-                  } else if (num >= 1 && num <= 20) {
-                    bgStyle = 'bg-[#ffd1dc]/65 hover:bg-[#ffd1dc] text-[#6b3040] border-[#ffd1dc]/90';
-                  } else if (num >= 21 && num <= 50) {
-                    bgStyle = 'bg-[#d4f0fc]/65 hover:bg-[#d4f0fc] text-[#2c5364] border-[#d4f0fc]/90';
-                  } else if (num >= 51 && num <= 80) {
-                    bgStyle = 'bg-[#e8d7fa]/65 hover:bg-[#e8d7fa] text-[#5b4a7a] border-[#e8d7fa]/90';
-                  } else {
-                    bgStyle = 'bg-[#d2f8d2]/65 hover:bg-[#d2f8d2] text-[#2d5a2d] border-[#d2f8d2]/90';
-                  }
-
-                  return (
-                    <button
-                      key={gift.id}
-                      type="button"
-                      disabled={isReserved && !isReservedByMe}
-                      onClick={() => setActiveGiftId(num)}
-                      className={`aspect-square flex items-center justify-center rounded-lg text-[10px] sm:text-xs font-bold transition-all border ${bgStyle} ${
-                        isActive ? 'ring-2 ring-offset-1 ring-[#c084fc] scale-105 z-10' : ''
-                      }`}
-                    >
-                      {isReservedByMe ? '✓' : num}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Detalhes do Presente Ativo Selecionado */}
-            {activeGiftId && gifts[activeGiftId - 1] && (
-              <div className="p-4 rounded-2xl bg-white border border-lilas-medium/40 shadow-xxs text-left animate-fadeIn flex flex-col justify-between gap-3">
-                <div>
-                  <div className="flex justify-between items-start">
-                    <span className={`text-[9px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md ${
-                      activeGiftId <= 20 ? 'bg-[#ffd1dc]/40 text-[#6b3040]' : 
-                      activeGiftId <= 50 ? 'bg-[#d4f0fc]/40 text-[#2c5364]' :
-                      activeGiftId <= 80 ? 'bg-[#e8d7fa]/40 text-[#5b4a7a]' : 'bg-[#d2f8d2]/40 text-[#2d5a2d]'
-                    }`}>
-                      {gifts[activeGiftId - 1].category}
-                    </span>
-                    <span className="text-[10px] font-bold text-[#8b7d99]">
-                      Número Selecionado: {activeGiftId}
-                    </span>
+                    <div className="flex justify-end pt-1">
+                      {isSelectedByMe ? (
+                        <button
+                          type="button"
+                          onClick={() => handleReserveGift(gift.id)}
+                          className="px-4 py-1.5 rounded-full text-xs font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#a5d6a7] transition-all hover:bg-red-50 hover:text-red-500 hover:border-red-200"
+                        >
+                          Reservado ✓ (Desfazer)
+                        </button>
+                      ) : isLimitReached ? (
+                        <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-400 border border-gray-200/50">
+                          Esgotado
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isReservedByAnother}
+                          onClick={() => handleReserveGift(gift.id)}
+                          className="px-4 py-1.5 rounded-full text-xs font-bold bg-rosa-baby hover:bg-[#ffb3c6] text-[#8b4f60] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-rosa-baby border border-rosa-baby/40 transition-colors"
+                        >
+                          Escolher
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-bold text-[#4a3e56] mt-2">
-                    {gifts[activeGiftId - 1].name}
-                  </h4>
-                  <p className="text-[10px] text-[#8b7d99] mt-1 font-medium">
-                    {gifts[activeGiftId - 1].reservedBy 
-                      ? (gifts[activeGiftId - 1].reservedBy === chefe ? 'Reservado por você 💖' : 'Indisponível (Já escolhido)') 
-                      : 'Livre para reserva'}
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  {gifts[activeGiftId - 1].reservedBy === chefe ? (
-                    <button
-                      type="button"
-                      onClick={() => handleReserveGift(activeGiftId)}
-                      className="w-full py-2.5 text-xs font-bold rounded-xl border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors active:scale-95"
-                    >
-                      Cancelar Escolha do Nº {activeGiftId}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={gifts[activeGiftId - 1].reservedBy !== null}
-                      onClick={() => handleReserveGift(activeGiftId)}
-                      className="w-full py-2.5 text-xs font-bold rounded-xl bg-rosa-baby hover:bg-[#ffb3c6] text-[#8b4f60] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-300 active:scale-95"
-                    >
-                      Escolher Presente Nº {activeGiftId}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+                );
+              })}
+            </div>
 
             {selectedGiftId && (
               <div className="p-3.5 rounded-2xl bg-verde-baby/30 border border-verde-baby/50 text-center text-xs font-semibold text-[#2d5a2d] animate-fadeIn">
-                Obrigado por escolher um presente! Salvamos sua escolha no convite. 🥰
+                Obrigado pela sua escolha! Salvamos sua marcação no convite. 🥰
               </div>
             )}
 
