@@ -446,14 +446,24 @@ export default function ConfirmarPresenca() {
               <Button
                 variant="accent"
                 onClick={() => setStep('gifts')}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-[#b39ddb] to-[#c084fc] hover:from-[#9575cd] hover:to-[#a78bfa] text-white font-bold shadow-md hover:scale-105 transition-all duration-300"
+                className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-[#b39ddb] to-[#c084fc] hover:from-[#9575cd] hover:to-[#a78bfa] text-white font-bold shadow-md hover:scale-[1.02] transition-all duration-300"
               >
                 <Gift className="w-5 h-5" />
                 Ver Lista de Sugestão de Presentes
               </Button>
+              
+              <Button
+                variant="primary"
+                onClick={() => setShowCheckoutModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-rosa-baby to-azul-baby text-[#3b4a7a] font-bold shadow-xs hover:scale-[1.02] transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4 text-[#3b4a7a]" />
+                Ver Cartão de Confirmação
+              </Button>
+
               <button
                 onClick={() => navigate('/')}
-                className="text-xs text-[#8b7d99] hover:underline font-semibold"
+                className="text-xs text-[#8b7d99] hover:underline font-semibold block w-full text-center pt-1"
               >
                 Voltar ao Início
               </button>
