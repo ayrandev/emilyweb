@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import FloatingButterflies from '../components/FloatingButterflies';
 import { Users, Phone, Mail, Calendar, Trash2, Search, ArrowLeft, Gift, UserPlus, Download, Sparkles, LayoutGrid, List } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../supabase';
 
 export default function Confirmados() {
   const navigate = useNavigate();
   const [guests, setGuests] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [loading, setLoading] = useState(false);
   
   // Estados para Adicionar Convidado Manualmente (Painel do Organizador)
   const [showAddModal, setShowAddModal] = useState(false);
@@ -20,21 +22,64 @@ export default function Confirmados() {
 
   // Carregar dados
   useEffect(() => {
-    const savedGuests = localStorage.getItem('party_guests');
-    if (savedGuests) {
-      setGuests(JSON.parse(savedGuests));
-    }
+    const loadGuests = async () => {
+      if (isSupabaseConfigured) {
+        try {
+          setLoading(true);
+          const { data, error } = await supabase
+            .from('party_guests')
+            .select('*')
+            .order('confirmedAt', { ascending: false });
+
+          if (error) throw error;
+          setGuests(data || []);
+        } catch (err) {
+          console.error("Erro ao carregar convidados do Supabase:", err.message);
+          alert("Não foi possível carregar os convidados online. Exibindo dados locais.");
+          loadLocalGuests();
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        loadLocalGuests();
+      }
+    };
+
+    const loadLocalGuests = () => {
+      const savedGuests = localStorage.getItem('party_guests');
+      if (savedGuests) {
+        setGuests(JSON.parse(savedGuests));
+      }
+    };
+
+    loadGuests();
   }, []);
 
   // Remover convidado
-  const handleRemoveGuest = (id) => {
+  const handleRemoveGuest = async (id) => {
     if (window.confirm('Deseja realmente remover esta confirmação?')) {
+      if (isSupabaseConfigured) {
+        try {
+          const { error } = await supabase
+            .from('party_guests')
+            .delete()
+            .eq('id', id);
+
+          if (error) throw error;
+        } catch (err) {
+          console.error("Erro ao excluir do Supabase:", err.message);
+          alert("Não foi possível excluir do banco de dados.");
+          return;
+        }
+      }
+
+      // Remover localmente também
       const guestToRemove = guests.find(g => g.id === id);
       const updatedGuests = guests.filter(g => g.id !== id);
       setGuests(updatedGuests);
       localStorage.setItem('party_guests', JSON.stringify(updatedGuests));
 
-      // Se esse convidado reservou um presente, precisamos liberá-lo na lista de presentes
+      // Se esse convidado reservou um presente, precisamos liberá-lo na lista de presentes local
       if (guestToRemove && guestToRemove.reservedGift) {
         const savedGifts = localStorage.getItem('party_gifts');
         if (savedGifts) {
@@ -52,7 +97,7 @@ export default function Confirmados() {
   };
 
   // Adicionar convidado manualmente
-  const handleAddManualGuest = (e) => {
+  const handleAddManualGuest = async (e) => {
     e.preventDefault();
     if (!newChefe.trim() || !newTelefone.trim() || !newEmail.trim()) {
       setFormError('Por favor, preencha todos os campos obrigatórios.');
@@ -87,7 +132,6 @@ export default function Confirmados() {
     });
 
     const newGuest = {
-      id: Date.now().toString(),
       chefe: newChefe.trim(),
       telefone: newTelefone.trim(),
       email: newEmail.trim(),
@@ -96,7 +140,30 @@ export default function Confirmados() {
       reservedGift: null
     };
 
-    const updatedGuests = [...guests, newGuest];
+    let guestId = Date.now().toString();
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('party_guests')
+          .insert([newGuest])
+          .select();
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          guestId = data[0].id;
+          newGuest.id = guestId;
+        }
+      } catch (err) {
+        console.error("Erro ao adicionar convidado no Supabase:", err.message);
+        alert("Erro ao salvar convidado online. Ele será adicionado apenas localmente.");
+        newGuest.id = guestId;
+      }
+    } else {
+      newGuest.id = guestId;
+    }
+
+    const updatedGuests = [newGuest, ...guests];
     setGuests(updatedGuests);
     localStorage.setItem('party_guests', JSON.stringify(updatedGuests));
 
@@ -280,7 +347,12 @@ export default function Confirmados() {
         </div>
 
         {/* Exibição dos Dados */}
-        {filteredGuests.length > 0 ? (
+        {loading ? (
+          <div className="py-16 text-center bg-white/40 border border-white/60 rounded-3xl backdrop-blur-md">
+            <div className="w-8 h-8 border-4 border-[#c084fc] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="text-xs text-[#8b7d99] font-semibold">Carregando lista de convidados...</p>
+          </div>
+        ) : filteredGuests.length > 0 ? (
           <>
             {/* Visualização em Grid (Cards) */}
             {viewMode === 'grid' && (
@@ -335,7 +407,7 @@ export default function Confirmados() {
                         </h5>
                         {guest.acompanhantes && guest.acompanhantes.length > 0 ? (
                           <ul className="text-xs text-[#6b5880] space-y-1.5 pl-2 border-l border-lilas-medium">
-                            <li className="font-semibold text-[#4a3e56]">• {guest.chefe} (Titular)</li>
+                             <li className="font-semibold text-[#4a3e56]">• {guest.chefe} (Titular)</li>
                             {guest.acompanhantes.map((acomp, idx) => {
                               const isChild = typeof acomp === 'object' && acomp.isChild;
                               const name = typeof acomp === 'object' ? acomp.name : acomp;

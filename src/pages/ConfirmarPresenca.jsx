@@ -4,6 +4,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import FloatingButterflies from '../components/FloatingButterflies';
 import { User, Phone, Mail, Plus, Trash2, CheckCircle2, Gift, Sparkles, ArrowRight, ArrowLeft, Download } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../supabase';
 
 const DEFAULT_GIFTS = [
   { 
@@ -47,6 +48,7 @@ export default function ConfirmarPresenca() {
   const [selectedGiftId, setSelectedGiftId] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [allGuestsForGifts, setAllGuestsForGifts] = useState([]); // Reservas gerais de presentes
 
   // Auto-fechamento do Toast de notificação
   useEffect(() => {
@@ -58,9 +60,29 @@ export default function ConfirmarPresenca() {
     }
   }, [showToast]);
 
-  // Carrega a escolha anterior do usuário se existir no localStorage
+  // Carrega a escolha anterior do usuário se existir no localStorage e as reservas totais no banco
   useEffect(() => {
+    const fetchReservations = async () => {
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('party_guests')
+            .select('reservedGiftId');
+          if (error) throw error;
+          setAllGuestsForGifts(data || []);
+        } catch (err) {
+          console.error("Erro ao buscar reservas de presentes:", err.message);
+        }
+      } else {
+        const savedGuests = localStorage.getItem('party_guests');
+        if (savedGuests) {
+          setAllGuestsForGifts(JSON.parse(savedGuests));
+        }
+      }
+    };
+
     if (step === 'gifts') {
+      fetchReservations();
       const currentGuestId = localStorage.getItem('current_guest_id');
       const savedGuests = localStorage.getItem('party_guests');
       if (currentGuestId && savedGuests) {
@@ -85,10 +107,7 @@ export default function ConfirmarPresenca() {
   };
 
   const getGiftReservationsCount = (giftId) => {
-    const savedGuests = localStorage.getItem('party_guests');
-    if (!savedGuests) return 0;
-    const guestsList = JSON.parse(savedGuests);
-    return guestsList.filter(g => g.reservedGiftId === giftId).length;
+    return allGuestsForGifts.filter(g => g.reservedGiftId === giftId).length;
   };
 
   const handleAcompanhanteChange = (index, field, value) => {
@@ -123,16 +142,11 @@ export default function ConfirmarPresenca() {
     return Object.keys(tempErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // Salvar convidado no localStorage
-    const savedGuests = localStorage.getItem('party_guests');
-    const guestsList = savedGuests ? JSON.parse(savedGuests) : [];
-    
     const newGuest = {
-      id: Date.now().toString(),
       chefe: chefe.trim(),
       telefone: telefone.trim(),
       email: email.trim(),
@@ -140,19 +154,45 @@ export default function ConfirmarPresenca() {
         .map(a => ({ name: a.name.trim(), isChild: a.isChild }))
         .filter(a => a.name),
       confirmedAt: new Date().toISOString(),
-      reservedGift: null // Será associado depois se escolher presente
+      reservedGift: null
     };
 
+    let guestId = Date.now().toString();
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('party_guests')
+          .insert([newGuest])
+          .select();
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          guestId = data[0].id.toString();
+          newGuest.id = guestId;
+        }
+      } catch (err) {
+        console.error("Erro ao salvar no Supabase:", err.message);
+        alert("Ocorreu um erro ao enviar sua confirmação online. Tentaremos continuar localmente.");
+        newGuest.id = guestId;
+      }
+    } else {
+      newGuest.id = guestId;
+    }
+
+    // Salvar convidado no localStorage para o cartão de confirmação local funcionar
+    const savedGuests = localStorage.getItem('party_guests');
+    const guestsList = savedGuests ? JSON.parse(savedGuests) : [];
     guestsList.push(newGuest);
     localStorage.setItem('party_guests', JSON.stringify(guestsList));
-    localStorage.setItem('current_guest_id', newGuest.id); // Guardar ID atual para vincular o presente
+    localStorage.setItem('current_guest_id', guestId);
     
     // Ir para tela de sucesso intermediária
     setStep('success');
     setShowToast(true);
   };
 
-  const handleReserveGift = (giftId) => {
+  const handleReserveGift = async (giftId) => {
     const currentGuestId = localStorage.getItem('current_guest_id');
     const savedGuests = localStorage.getItem('party_guests');
     const guestsList = savedGuests ? JSON.parse(savedGuests) : [];
@@ -163,26 +203,72 @@ export default function ConfirmarPresenca() {
     const isRemoving = selectedGiftId === giftId;
     const selectedGift = DEFAULT_GIFTS.find(g => g.id === giftId);
 
+    // Validar limites
     if (!isRemoving && selectedGift) {
-      // Contar quantas reservas esse presente já tem no total
-      const reservationsCount = guestsList.filter(g => g.reservedGiftId === giftId).length;
-      if (reservationsCount >= selectedGift.limit) {
-        alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações. Por favor, escolha outra opção!`);
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('party_guests')
+            .select('id')
+            .eq('reservedGiftId', giftId);
+
+          if (error) throw error;
+          if (data && data.length >= selectedGift.limit) {
+            alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações. Por favor, escolha outra opção!`);
+            return;
+          }
+        } catch (err) {
+          console.error("Erro ao validar limite do presente:", err.message);
+        }
+      } else {
+        const reservationsCount = guestsList.filter(g => g.reservedGiftId === giftId).length;
+        if (reservationsCount >= selectedGift.limit) {
+          alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações. Por favor, escolha outra opção!`);
+          return;
+        }
+      }
+    }
+
+    const reservedGiftIdValue = isRemoving ? null : giftId;
+    const reservedGiftNameValue = isRemoving ? null : (selectedGift ? selectedGift.name : null);
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('party_guests')
+          .update({
+            reservedGiftId: reservedGiftIdValue,
+            reservedGift: reservedGiftNameValue
+          })
+          .eq('id', currentGuestId);
+
+        if (error) throw error;
+      } catch (err) {
+        console.error("Erro ao salvar presente no Supabase:", err.message);
+        alert("Erro ao salvar a escolha do presente.");
         return;
       }
     }
 
-    if (isRemoving) {
-      guestsList[guestIndex].reservedGiftId = null;
-      guestsList[guestIndex].reservedGift = null;
-      setSelectedGiftId(null);
-    } else {
-      guestsList[guestIndex].reservedGiftId = giftId;
-      guestsList[guestIndex].reservedGift = selectedGift ? selectedGift.name : null;
-      setSelectedGiftId(giftId);
-    }
-
+    // Salvar localmente
+    guestsList[guestIndex].reservedGiftId = reservedGiftIdValue;
+    guestsList[guestIndex].reservedGift = reservedGiftNameValue;
+    setSelectedGiftId(reservedGiftIdValue);
     localStorage.setItem('party_guests', JSON.stringify(guestsList));
+
+    // Atualizar visualização do contador em tempo real
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('party_guests')
+          .select('reservedGiftId');
+        if (!error && data) {
+          setAllGuestsForGifts(data);
+        }
+      } catch (e) {}
+    } else {
+      setAllGuestsForGifts(guestsList);
+    }
   };
 
   const handleDownloadCard = () => {
