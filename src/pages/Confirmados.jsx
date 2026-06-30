@@ -65,12 +65,33 @@ export default function Confirmados() {
       .filter(name => name.length > 0)
       .slice(0, 4); // Limite de 4 acompanhantes
 
+    const parsedAcompanhantes = acompNames.map(name => {
+      const lowercaseName = name.toLowerCase();
+      const isChild = lowercaseName.includes('(criança)') || 
+                      lowercaseName.includes('(crianca)') || 
+                      lowercaseName.includes('(menor de 6)') || 
+                      lowercaseName.includes('(menor de 6a)') || 
+                      lowercaseName.includes('<6') ||
+                      lowercaseName.includes('< 6');
+                      
+      const cleanedName = name
+        .replace(/\(criança\)/gi, '')
+        .replace(/\(crianca\)/gi, '')
+        .replace(/\(menor de 6\)/gi, '')
+        .replace(/\(menor de 6a\)/gi, '')
+        .replace(/<6/gi, '')
+        .replace(/< 6/gi, '')
+        .trim();
+
+      return { name: cleanedName, isChild };
+    });
+
     const newGuest = {
       id: Date.now().toString(),
       chefe: newChefe.trim(),
       telefone: newTelefone.trim(),
       email: newEmail.trim(),
-      acompanhantes: acompNames,
+      acompanhantes: parsedAcompanhantes,
       confirmedAt: new Date().toISOString(),
       reservedGift: null
     };
@@ -103,12 +124,20 @@ export default function Confirmados() {
   const filteredGuests = guests.filter(guest => 
     guest.chefe.toLowerCase().includes(searchTerm.toLowerCase()) ||
     guest.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (guest.acompanhantes && guest.acompanhantes.some(a => a.toLowerCase().includes(searchTerm.toLowerCase())))
+    (guest.acompanhantes && guest.acompanhantes.some(a => {
+      const name = typeof a === 'object' ? a.name : a;
+      return name.toLowerCase().includes(searchTerm.toLowerCase());
+    }))
   );
 
   // Estatísticas
   const totalFamilias = guests.length;
   const totalPessoas = guests.reduce((acc, curr) => acc + 1 + (curr.acompanhantes?.length || 0), 0);
+  const totalCriancas = guests.reduce((acc, curr) => {
+    const kidsCount = curr.acompanhantes?.filter(a => typeof a === 'object' && a.isChild).length || 0;
+    return acc + kidsCount;
+  }, 0);
+  const totalAdultos = totalPessoas - totalCriancas;
   const totalPresentesReservados = guests.filter(g => g.reservedGift).length;
 
   return (
@@ -162,14 +191,15 @@ export default function Confirmados() {
         </div>
 
         {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
           <div className="p-5 rounded-3xl bg-white/60 border border-white/80 shadow-xs flex items-center gap-4">
             <div className="p-3.5 rounded-2xl bg-lilas-soft text-[#6b5880]">
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Famílias Confirmadas</p>
-              <h3 className="text-2xl font-bold text-[#4a3e56]">{totalFamilias}</h3>
+              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Total Confirmados</p>
+              <h3 className="text-2xl font-bold text-[#4a3e56]">{totalPessoas}</h3>
+              <p className="text-[10px] text-[#8b7d99] mt-0.5 font-medium">Famílias: {totalFamilias}</p>
             </div>
           </div>
 
@@ -178,18 +208,31 @@ export default function Confirmados() {
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Total de Pessoas</p>
-              <h3 className="text-2xl font-bold text-[#4a3e56]">{totalPessoas}</h3>
+              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Adultos (Pagantes)</p>
+              <h3 className="text-2xl font-bold text-[#4a3e56]">{totalAdultos}</h3>
+              <p className="text-[10px] text-[#8b7d99] mt-0.5 font-medium">Acima de 6 anos</p>
             </div>
           </div>
 
           <div className="p-5 rounded-3xl bg-white/60 border border-white/80 shadow-xs flex items-center gap-4">
             <div className="p-3.5 rounded-2xl bg-azul-baby/40 text-[#2c5364]">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Crianças (Isentas)</p>
+              <h3 className="text-2xl font-bold text-[#4a3e56]">{totalCriancas}</h3>
+              <p className="text-[10px] text-[#8b7d99] mt-0.5 font-medium">Menores de 6 anos</p>
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-white/60 border border-white/80 shadow-xs flex items-center gap-4">
+            <div className="p-3.5 rounded-2xl bg-verde-baby/40 text-[#2d5a2d]">
               <Gift className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Presentes Escolhidos</p>
+              <p className="text-xs text-[#8b7d99] font-bold uppercase tracking-wider">Presentes</p>
               <h3 className="text-2xl font-bold text-[#4a3e56]">{totalPresentesReservados}</h3>
+              <p className="text-[10px] text-[#8b7d99] mt-0.5 font-medium">Reservados</p>
             </div>
           </div>
         </div>
@@ -291,11 +334,22 @@ export default function Confirmados() {
                           </span>
                         </h5>
                         {guest.acompanhantes && guest.acompanhantes.length > 0 ? (
-                          <ul className="text-xs text-[#6b5880] space-y-1 pl-2 border-l border-lilas-medium">
-                            <li>• {guest.chefe} (Titular)</li>
-                            {guest.acompanhantes.map((acomp, idx) => (
-                              <li key={idx}>• {acomp}</li>
-                            ))}
+                          <ul className="text-xs text-[#6b5880] space-y-1.5 pl-2 border-l border-lilas-medium">
+                            <li className="font-semibold text-[#4a3e56]">• {guest.chefe} (Titular)</li>
+                            {guest.acompanhantes.map((acomp, idx) => {
+                              const isChild = typeof acomp === 'object' && acomp.isChild;
+                              const name = typeof acomp === 'object' ? acomp.name : acomp;
+                              return (
+                                <li key={idx} className="flex items-center gap-1.5 justify-between">
+                                  <span>• {name}</span>
+                                  {isChild && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-azul-baby/45 text-[#2c5364] flex items-center gap-0.5" title="Isento no buffet (Menor de 6 anos)">
+                                      👶 Criança
+                                    </span>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : (
                           <p className="text-xs text-[#b0a7b8] italic pl-2 border-l border-lilas-medium">
@@ -351,15 +405,44 @@ export default function Confirmados() {
                             Confirmado em: {new Date(guest.confirmedAt).toLocaleDateString('pt-BR')}
                           </span>
                         </td>
-                        <td className="p-4 text-xs text-[#6b5880] max-w-[200px] truncate" title={guest.acompanhantes?.join(', ')}>
-                          {guest.acompanhantes && guest.acompanhantes.length > 0
-                            ? guest.acompanhantes.join(', ')
-                            : <span className="italic text-[#b0a7b8]">Nenhum</span>}
+                        <td className="p-4 text-xs text-[#6b5880] max-w-[200px]">
+                          {guest.acompanhantes && guest.acompanhantes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {guest.acompanhantes.map((acomp, idx) => {
+                                const isChild = typeof acomp === 'object' && acomp.isChild;
+                                const name = typeof acomp === 'object' ? acomp.name : acomp;
+                                return (
+                                  <span key={idx} className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md border text-[10px] ${
+                                    isChild 
+                                      ? 'bg-azul-baby/20 border-azul-baby/40 text-[#2c5364]' 
+                                      : 'bg-white border-lilas-medium/25 text-[#4a3e56]'
+                                  }`}>
+                                    {isChild && '👶 '}
+                                    {name}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="italic text-[#b0a7b8]">Apenas Titular</span>
+                          )}
                         </td>
                         <td className="p-4 text-center font-bold text-xs">
-                          <span className="px-2.5 py-0.5 rounded-full bg-[#ffd1dc]/40 text-[#6b3040]">
-                            {1 + (guest.acompanhantes?.length || 0)}
-                          </span>
+                          {(() => {
+                            const total = 1 + (guest.acompanhantes?.length || 0);
+                            const kids = guest.acompanhantes?.filter(a => typeof a === 'object' && a.isChild).length || 0;
+                            const adults = total - kids;
+                            return (
+                              <div className="flex flex-col items-center justify-center gap-0.5">
+                                <span className="px-2.5 py-0.5 rounded-full bg-[#ffd1dc]/40 text-[#6b3040] font-bold">
+                                  {total}
+                                </span>
+                                <span className="text-[9px] text-[#8b7d99] font-medium leading-none whitespace-nowrap">
+                                  ({adults} ad. + {kids} cr.)
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="p-4 text-xs space-y-0.5">
                           <div className="font-semibold">{guest.telefone}</div>

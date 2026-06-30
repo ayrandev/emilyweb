@@ -74,7 +74,7 @@ export default function ConfirmarPresenca() {
 
   const addAcompanhante = () => {
     if (acompanhantes.length < 4) {
-      setAcompanhantes([...acompanhantes, '']);
+      setAcompanhantes([...acompanhantes, { name: '', isChild: false }]);
     }
   };
 
@@ -90,9 +90,9 @@ export default function ConfirmarPresenca() {
     return guestsList.filter(g => g.reservedGiftId === giftId).length;
   };
 
-  const handleAcompanhanteChange = (index, value) => {
+  const handleAcompanhanteChange = (index, field, value) => {
     const newAcompanhantes = [...acompanhantes];
-    newAcompanhantes[index] = value;
+    newAcompanhantes[index] = { ...newAcompanhantes[index], [field]: value };
     setAcompanhantes(newAcompanhantes);
   };
 
@@ -113,7 +113,7 @@ export default function ConfirmarPresenca() {
 
     // Acompanhantes não podem estar em branco se adicionados
     acompanhantes.forEach((acomp, idx) => {
-      if (!acomp.trim()) {
+      if (!acomp.name || !acomp.name.trim()) {
         tempErrors[`acomp_${idx}`] = 'Preencha o nome do acompanhante ou remova-o';
       }
     });
@@ -135,7 +135,9 @@ export default function ConfirmarPresenca() {
       chefe: chefe.trim(),
       telefone: telefone.trim(),
       email: email.trim(),
-      acompanhantes: acompanhantes.map(a => a.trim()).filter(Boolean),
+      acompanhantes: acompanhantes
+        .map(a => ({ name: a.name.trim(), isChild: a.isChild }))
+        .filter(a => a.name),
       confirmedAt: new Date().toISOString(),
       reservedGift: null // Será associado depois se escolher presente
     };
@@ -257,24 +259,35 @@ export default function ConfirmarPresenca() {
                 </div>
 
                 {acompanhantes.length > 0 ? (
-                  <div className="space-y-3 mt-2">
+                  <div className="space-y-4 mt-2">
                     {acompanhantes.map((acomp, index) => (
-                      <div key={index} className="flex gap-2 items-center animate-fadeIn">
-                        <Input
-                          placeholder={`Nome do acompanhante ${index + 1}`}
-                          value={acomp}
-                          onChange={(e) => handleAcompanhanteChange(index, e.target.value)}
-                          error={errors[`acomp_${index}`]}
-                          className="flex-1"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeAcompanhante(index)}
-                          className="p-3 mt-5 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-500 transition-colors"
-                          title="Remover acompanhante"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <div key={index} className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/45 border border-lilas-medium/20 animate-fadeIn">
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            placeholder={`Nome do acompanhante ${index + 1}`}
+                            value={acomp.name || ''}
+                            onChange={(e) => handleAcompanhanteChange(index, 'name', e.target.value)}
+                            error={errors[`acomp_${index}`]}
+                            className="flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeAcompanhante(index)}
+                            className="p-3 mt-5 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+                            title="Remover acompanhante"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <label className="flex items-center gap-2 text-[10px] text-[#6b5880] font-semibold pl-1 select-none cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={acomp.isChild || false}
+                            onChange={(e) => handleAcompanhanteChange(index, 'isChild', e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-gray-300 text-[#8b4f60] focus:ring-[#8b4f60] accent-rosa-baby"
+                          />
+                          <span>Menor de 6 anos (Criança - não pagante no buffet)</span>
+                        </label>
                       </div>
                     ))}
                   </div>
@@ -329,7 +342,14 @@ export default function ConfirmarPresenca() {
                 <li>• Responsável: <strong>{chefe}</strong></li>
                 <li>• Contato: <strong>{telefone}</strong></li>
                 {acompanhantes.length > 0 && (
-                  <li>• Acompanhantes: <strong>{acompanhantes.length} pessoa(s)</strong></li>
+                  <li>
+                    • Acompanhantes: <strong>{acompanhantes.length} pessoa(s)</strong>
+                    {acompanhantes.filter(a => a.isChild).length > 0 && (
+                      <span className="text-[10px] text-[#2d5a2d] block font-semibold pl-2">
+                        └ {acompanhantes.filter(a => a.isChild).length} criança(s) menor(es) de 6 anos
+                      </span>
+                    )}
+                  </li>
                 )}
               </ul>
             </div>
