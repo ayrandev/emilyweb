@@ -70,7 +70,7 @@ export default function Home() {
         <div className="relative z-20 max-w-2xl mx-auto flex flex-col items-center animate-[sway_10s_ease-in-out_infinite]">
           
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rosa-baby/50 border border-rosa-baby/70 text-xs font-bold text-[#8b4f60] mb-4 backdrop-blur-xxs">
-            <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
+            <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '5s' }} />
             Você está convidado!
           </div>
           
@@ -84,8 +84,8 @@ export default function Home() {
             🌸 1º Aninho 🌸
           </span>
           <p className="text-sm md:text-base text-[#4a3e56] max-w-lg mx-auto leading-relaxed font-semibold px-4">
-            Parece que foi ontem que você chegou para colorir o nosso mundo e transformar a nossa vida em um jardim repleto de amor. 
-            Ver você crescer é como contemplar a mais linda borboleta ganhando asas para voar. 
+            Parece que foi ontem que você chegou para encher nossos dias de amor, alegria e descobertas. 
+            Em um piscar de olhos, nossa pequena cresceu e já está celebrando seu primeiro aninho, deixando nossa vida ainda mais feliz a cada sorriso. 
             <span className="block mt-4 text-[#6b3040] text-base md:text-lg font-bold leading-normal">
               Com muita gratidão, convidamos você para fazer parte deste momento único e especial, celebrando o 1º aninho da nossa pequena Emily Maria!
             </span>
