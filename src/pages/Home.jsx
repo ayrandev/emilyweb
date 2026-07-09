@@ -225,6 +225,15 @@ export default function Home() {
           >
             Confirmar Presença
           </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/acesso')}
+            className="text-sm px-8 py-3 bg-white/50 text-[#6b3040] hover:bg-white/80 transition-all duration-300 border border-rosa-baby/50"
+          >
+            Acessar minha Confirmação
+          </Button>
+
           <span className="text-xs text-[#8b7d99] font-medium">
             Por favor, confirme sua presença até o dia 22/08
           </span>

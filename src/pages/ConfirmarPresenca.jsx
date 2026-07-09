@@ -30,6 +30,12 @@ const DEFAULT_GIFTS = [
     name: 'Roupinha de 3 anos, Sapato (Tam: 23) ou Brinquedos Educativos', 
     limit: 20,
     category: 'Tamanho 3 anos' 
+  },
+  { 
+    id: 5, 
+    name: 'Contribuição via Pix', 
+    limit: 9999,
+    category: 'Presente em Dinheiro' 
   }
 ];
 
@@ -245,8 +251,7 @@ export default function ConfirmarPresenca() {
         if (error) throw error;
       } catch (err) {
         console.error("Erro ao salvar presente no Supabase:", err.message);
-        alert("Erro ao salvar a escolha do presente.");
-        return;
+        alert("Não foi possível salvar no banco online (verifique as permissões de UPDATE no Supabase). A alteração será salva apenas localmente.");
       }
     }
 
@@ -298,6 +303,17 @@ export default function ConfirmarPresenca() {
       ? guest.reservedGift 
       : 'Nenhuma sugestão marcada (Livre)';
 
+    const pixHtml = guest.reservedGiftId === 5 
+      ? `<div class="section" style="background-color: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 8px; padding: 10px; margin-top: 10px;">
+          <div class="section-title" style="color: #0284c7; margin-bottom: 2px;">Dados do Pix</div>
+          <div class="content" style="font-size: 13px; color: #0369a1;">
+            <strong>Chave (Celular):</strong> (85)9 8539-8517<br>
+            <strong>Instituição:</strong> PicPay<br>
+            <strong>Nome:</strong> Ayran Vieira dos Reis Cruz
+          </div>
+         </div>`
+      : '';
+
     const htmlContent = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -331,6 +347,7 @@ export default function ConfirmarPresenca() {
     <div class="section">
       <div class="section-title">Presente Escolhido</div>
       <div class="content">${giftText}</div>
+      ${pixHtml}
     </div>
     
     <div class="section">
@@ -735,6 +752,13 @@ export default function ConfirmarPresenca() {
                 <div className="border-t border-[#c084fc]/20 pt-2.5">
                   <h4 className="text-[9px] font-bold text-[#8b7d99] uppercase tracking-wider">Sugestão de Presente</h4>
                   <p className="text-xs font-bold text-[#2e7d32] mt-0.5 leading-snug">{giftText}</p>
+                  {guest.reservedGiftId === 5 && (
+                    <div className="mt-2 p-2 bg-[#f0f9ff] border border-[#bae6fd] rounded-lg">
+                      <p className="text-[10px] font-bold text-[#0284c7] mb-0.5">DADOS DO PIX:</p>
+                      <p className="text-xs font-bold text-[#0369a1] mb-0.5">(85)9 8539-8517</p>
+                      <p className="text-[10px] text-[#0ea5e9] leading-tight">PicPay<br/>Ayran Vieira dos Reis Cruz</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-dashed border-[#c084fc]/20 pt-2.5 text-[10px] text-[#6b5880] space-y-0.5">
