@@ -112,8 +112,43 @@ export default function ConfirmarPresenca() {
     setAcompanhantes(newAcompanhantes);
   };
 
+  const normalizeGiftId = (value) => String(value ?? '');
+
+  const parseSelectedGiftIds = (value) => {
+    if (Array.isArray(value)) {
+      return value.map(normalizeGiftId).filter(Boolean);
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map(normalizeGiftId).filter(Boolean);
+        }
+      } catch (_) {}
+
+      return trimmed
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map(normalizeGiftId);
+    }
+
+    if (value !== null && value !== undefined) {
+      return [normalizeGiftId(value)].filter(Boolean);
+    }
+
+    return [];
+  };
+
   const getGiftReservationsCount = (giftId) => {
-    return allGuestsForGifts.filter(g => g.reservedGiftId === giftId).length;
+    const normalizedGiftId = normalizeGiftId(giftId);
+    return allGuestsForGifts.reduce((count, guestData) => {
+      return count + parseSelectedGiftIds(guestData?.reservedGiftId).filter(id => normalizeGiftId(id) === normalizedGiftId).length;
+    }, 0);
   };
 
   const handleAcompanhanteChange = (index, field, value) => {
@@ -206,20 +241,29 @@ export default function ConfirmarPresenca() {
     
     if (guestIndex === -1) return;
 
-    const isRemoving = selectedGiftId === giftId;
-    const selectedGift = DEFAULT_GIFTS.find(g => g.id === giftId);
+    const selectedGiftIds = parseSelectedGiftIds(guestsList[guestIndex]?.reservedGiftId);
+    const normalizedGiftId = normalizeGiftId(giftId);
+    const isRemoving = selectedGiftIds.includes(normalizedGiftId);
+    const selectedGift = DEFAULT_GIFTS.find(g => normalizeGiftId(g.id) === normalizedGiftId);
 
-    // Validar limites
     if (!isRemoving && selectedGift) {
+      if (selectedGiftIds.length >= 2) {
+        alert('Você pode escolher até 2 presentes.');
+        return;
+      }
+
       if (isSupabaseConfigured) {
         try {
           const { data, error } = await supabase
             .from('party_guests')
-            .select('id')
-            .eq('reservedGiftId', giftId);
+            .select('id');
 
           if (error) throw error;
-          if (data && data.length >= selectedGift.limit) {
+          const reservationsCount = (data || []).reduce((count, guestData) => {
+            return count + parseSelectedGiftIds(guestData?.reservedGiftId).filter(id => normalizeGiftId(id) === normalizedGiftId).length;
+          }, 0);
+
+          if (reservationsCount >= selectedGift.limit) {
             alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações. Por favor, escolha outra opção!`);
             return;
           }
@@ -227,7 +271,9 @@ export default function ConfirmarPresenca() {
           console.error("Erro ao validar limite do presente:", err.message);
         }
       } else {
-        const reservationsCount = guestsList.filter(g => g.reservedGiftId === giftId).length;
+        const reservationsCount = guestsList.reduce((count, guestData) => {
+          return count + parseSelectedGiftIds(guestData?.reservedGiftId).filter(id => normalizeGiftId(id) === normalizedGiftId).length;
+        }, 0);
         if (reservationsCount >= selectedGift.limit) {
           alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações. Por favor, escolha outra opção!`);
           return;
@@ -235,8 +281,18 @@ export default function ConfirmarPresenca() {
       }
     }
 
-    const reservedGiftIdValue = isRemoving ? null : giftId;
-    const reservedGiftNameValue = isRemoving ? null : (selectedGift ? selectedGift.name : null);
+    const nextSelectedGiftIds = isRemoving
+      ? selectedGiftIds.filter(id => normalizeGiftId(id) !== normalizedGiftId)
+      : [...selectedGiftIds, normalizedGiftId].filter(Boolean);
+
+    const reservedGiftIdValue = nextSelectedGiftIds.length > 0 ? JSON.stringify(nextSelectedGiftIds) : null;
+    const reservedGiftNameValue = nextSelectedGiftIds.length > 0
+      ? nextSelectedGiftIds
+          .map(id => DEFAULT_GIFTS.find(gift => normalizeGiftId(gift.id) === normalizeGiftId(id)))
+          .filter(Boolean)
+          .map(gift => gift.name)
+          .join(' • ')
+      : null;
 
     if (isSupabaseConfigured) {
       try {
@@ -258,7 +314,8 @@ export default function ConfirmarPresenca() {
     // Salvar localmente
     guestsList[guestIndex].reservedGiftId = reservedGiftIdValue;
     guestsList[guestIndex].reservedGift = reservedGiftNameValue;
-    setSelectedGiftId(reservedGiftIdValue);
+    guestsList[guestIndex].reservedGiftIds = nextSelectedGiftIds;
+    setSelectedGiftId(nextSelectedGiftIds.length > 0 ? nextSelectedGiftIds[0] : null);
     localStorage.setItem('party_guests', JSON.stringify(guestsList));
 
     // Atualizar visualização do contador em tempo real
@@ -299,11 +356,16 @@ export default function ConfirmarPresenca() {
          </div>`
       : '';
 
-    const giftText = guest.reservedGift 
-      ? guest.reservedGift 
+    const selectedGiftIds = parseSelectedGiftIds(guest?.reservedGiftId);
+    const giftText = selectedGiftIds.length > 0
+      ? selectedGiftIds
+          .map(id => DEFAULT_GIFTS.find(gift => normalizeGiftId(gift.id) === normalizeGiftId(id)))
+          .filter(Boolean)
+          .map(gift => gift.name)
+          .join(' • ')
       : 'Nenhuma sugestão marcada (Livre)';
 
-    const pixHtml = guest.reservedGiftId === 5 
+    const pixHtml = selectedGiftIds.includes(normalizeGiftId(5))
       ? `<div class="section" style="background-color: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 8px; padding: 10px; margin-top: 10px;">
           <div class="section-title" style="color: #0284c7; margin-bottom: 2px;">Dados do Pix</div>
           <div class="content" style="font-size: 13px; color: #0369a1;">
@@ -591,9 +653,10 @@ export default function ConfirmarPresenca() {
             <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1 scrollbar-thin text-left">
               {DEFAULT_GIFTS.map((gift) => {
                 const count = getGiftReservationsCount(gift.id);
-                const isSelectedByMe = selectedGiftId === gift.id;
+                const selectedGiftIds = parseSelectedGiftIds(localStorage.getItem('party_guests') ? JSON.parse(localStorage.getItem('party_guests')).find(g => g.id === localStorage.getItem('current_guest_id'))?.reservedGiftId : null);
+                const isSelectedByMe = selectedGiftIds.includes(normalizeGiftId(gift.id));
                 const isLimitReached = count >= gift.limit;
-                const isReservedByAnother = selectedGiftId !== null && !isSelectedByMe;
+                const canSelect = !isSelectedByMe && !isLimitReached && selectedGiftIds.length < 2;
 
                 return (
                   <div
@@ -638,11 +701,11 @@ export default function ConfirmarPresenca() {
                       ) : (
                         <button
                           type="button"
-                          disabled={isReservedByAnother}
+                          disabled={!canSelect}
                           onClick={() => handleReserveGift(gift.id)}
                           className="px-4 py-1.5 rounded-full text-xs font-bold bg-rosa-baby hover:bg-[#ffb3c6] text-[#8b4f60] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-rosa-baby border border-rosa-baby/40 transition-colors"
                         >
-                          Escolher
+                          {selectedGiftIds.length >= 2 ? 'Limite atingido' : 'Escolher'}
                         </button>
                       )}
                     </div>
@@ -653,7 +716,7 @@ export default function ConfirmarPresenca() {
 
             {selectedGiftId && (
               <div className="p-3.5 rounded-2xl bg-verde-baby/30 border border-verde-baby/50 text-center text-xs font-semibold text-[#2d5a2d] animate-fadeIn">
-                Obrigado pela sua escolha! Salvamos sua marcação no convite. 🥰
+                Obrigado pela sua escolha! Salvamos as suas marcações no convite. 🥰
               </div>
             )}
 

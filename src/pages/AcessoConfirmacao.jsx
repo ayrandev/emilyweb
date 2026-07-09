@@ -147,15 +147,86 @@ export default function AcessoConfirmacao() {
     setShowToast(true);
   };
 
+  const normalizeGiftId = (value) => String(value ?? '');
+
+  const parseSelectedGiftIds = (value) => {
+    if (Array.isArray(value)) {
+      return value.map(normalizeGiftId).filter(Boolean);
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map(normalizeGiftId).filter(Boolean);
+        }
+      } catch (_) {}
+
+      return trimmed
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map(normalizeGiftId);
+    }
+
+    if (value !== null && value !== undefined) {
+      return [normalizeGiftId(value)].filter(Boolean);
+    }
+
+    return [];
+  };
+
+  const getSelectedGiftIds = (guestData) => {
+    if (Array.isArray(guestData?.reservedGiftIds)) {
+      return guestData.reservedGiftIds.map(normalizeGiftId).filter(Boolean);
+    }
+
+    return parseSelectedGiftIds(guestData?.reservedGiftId);
+  };
+
+  const getSelectedGiftNames = (guestData) => {
+    const selectedIds = getSelectedGiftIds(guestData);
+    const names = selectedIds
+      .map(id => DEFAULT_GIFTS.find(gift => normalizeGiftId(gift.id) === normalizeGiftId(id)))
+      .filter(Boolean)
+      .map(gift => gift.name);
+
+    if (names.length > 0) {
+      return names;
+    }
+
+    if (guestData?.reservedGift) {
+      return String(guestData.reservedGift)
+        .split(/\s*\|\s*|\s*•\s*/)
+        .map(item => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  };
+
   const getGiftReservationsCount = (giftId) => {
-    return allGuestsForGifts.filter(g => g.reservedGiftId === giftId).length;
+    const normalizedGiftId = normalizeGiftId(giftId);
+    return allGuestsForGifts.reduce((count, guestData) => {
+      return count + getSelectedGiftIds(guestData).filter(id => normalizeGiftId(id) === normalizedGiftId).length;
+    }, 0);
   };
 
   const handleReserveGift = async (giftId) => {
-    const isRemoving = guest.reservedGiftId === giftId;
-    const selectedGift = DEFAULT_GIFTS.find(g => g.id === giftId);
+    const normalizedGiftId = normalizeGiftId(giftId);
+    const selectedGiftIds = getSelectedGiftIds(guest);
+    const isRemoving = selectedGiftIds.includes(normalizedGiftId);
+    const selectedGift = DEFAULT_GIFTS.find(g => normalizeGiftId(g.id) === normalizedGiftId);
 
     if (!isRemoving && selectedGift) {
+      if (selectedGiftIds.length >= 2) {
+        alert('Você pode escolher até 2 presentes.');
+        return;
+      }
+
       const count = getGiftReservationsCount(giftId);
       if (count >= selectedGift.limit) {
         alert(`A sugestão "${selectedGift.category}" já atingiu o limite de ${selectedGift.limit} marcações.`);
@@ -163,13 +234,23 @@ export default function AcessoConfirmacao() {
       }
     }
 
-    const reservedGiftIdValue = isRemoving ? null : giftId;
-    const reservedGiftNameValue = isRemoving ? null : (selectedGift ? selectedGift.name : null);
+    const nextSelectedGiftIds = isRemoving
+      ? selectedGiftIds.filter(id => normalizeGiftId(id) !== normalizedGiftId)
+      : [...selectedGiftIds, normalizedGiftId].filter(Boolean);
+
+    const nextSelectedGiftNames = nextSelectedGiftIds
+      .map(id => DEFAULT_GIFTS.find(gift => normalizeGiftId(gift.id) === normalizeGiftId(id)))
+      .filter(Boolean)
+      .map(gift => gift.name);
+
+    const reservedGiftIdValue = nextSelectedGiftIds.length > 0 ? JSON.stringify(nextSelectedGiftIds) : null;
+    const reservedGiftNameValue = nextSelectedGiftNames.length > 0 ? nextSelectedGiftNames.join(' • ') : null;
     
     const updatedGuest = { 
       ...guest, 
-      reservedGiftId: reservedGiftIdValue, 
-      reservedGift: reservedGiftNameValue 
+      reservedGiftId: reservedGiftIdValue,
+      reservedGift: reservedGiftNameValue,
+      reservedGiftIds: nextSelectedGiftIds
     };
 
     if (isSupabaseConfigured) {
@@ -223,11 +304,12 @@ export default function AcessoConfirmacao() {
          </div>`
       : '';
 
-    const giftText = guest.reservedGift 
-      ? guest.reservedGift 
+    const selectedGiftNames = getSelectedGiftNames(guest);
+    const giftText = selectedGiftNames.length > 0
+      ? selectedGiftNames.join(' • ')
       : 'Nenhuma sugestão marcada (Livre)';
 
-    const pixHtml = guest.reservedGiftId === 5 
+    const pixHtml = getSelectedGiftIds(guest).includes(normalizeGiftId(5))
       ? `<div class="section" style="background-color: #f0f9ff; border: 1px dashed #bae6fd; border-radius: 8px; padding: 10px; margin-top: 10px;">
           <div class="section-title" style="color: #0284c7; margin-bottom: 2px;">Dados do Pix</div>
           <div class="content" style="font-size: 13px; color: #0369a1;">
@@ -399,7 +481,7 @@ export default function AcessoConfirmacao() {
               <div className="pt-4 border-t border-dashed border-lilas-medium/40">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-xs font-bold text-[#8b7d99] uppercase tracking-wider">Presente Escolhido</h3>
-                  {guest.reservedGift && (
+                  {getSelectedGiftNames(guest).length > 0 && (
                     <button 
                       onClick={() => setShowGifts(!showGifts)}
                       className="text-[10px] font-bold text-[#6b3040] hover:underline bg-rosa-baby/30 px-2 py-1 rounded-md"
@@ -409,15 +491,15 @@ export default function AcessoConfirmacao() {
                   )}
                 </div>
                 {!showGifts && (
-                  guest.reservedGift ? (
+                  getSelectedGiftNames(guest).length > 0 ? (
                     <div className="flex flex-col gap-2">
                       <div className="p-3 bg-[#e8f5e9]/50 border border-[#a5d6a7] rounded-xl flex items-start gap-2">
                         <Gift className="w-4 h-4 text-[#2e7d32] shrink-0 mt-0.5" />
                         <span className="text-xs font-semibold text-[#2d5a2d]">
-                          {guest.reservedGift}
+                          {getSelectedGiftNames(guest).join(' • ')}
                         </span>
                       </div>
-                      {guest.reservedGiftId === 5 && (
+                      {getSelectedGiftIds(guest).includes(normalizeGiftId(5)) && (
                         <div className="p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-xl mt-1">
                           <p className="text-[10px] font-bold text-[#0284c7] mb-0.5">DADOS DO PIX:</p>
                           <p className="text-sm font-bold text-[#0369a1] mb-0.5">(85)9 8539-8517</p>
@@ -439,9 +521,10 @@ export default function AcessoConfirmacao() {
                 <div className="pt-2 animate-fadeIn space-y-3 max-h-[300px] overflow-y-auto pr-1">
                   {DEFAULT_GIFTS.map(gift => {
                     const count = getGiftReservationsCount(gift.id);
-                    const isSelectedByMe = guest.reservedGiftId === gift.id;
+                    const selectedGiftIds = getSelectedGiftIds(guest);
+                    const isSelectedByMe = selectedGiftIds.includes(normalizeGiftId(gift.id));
                     const isLimitReached = count >= gift.limit;
-                    const isReservedByAnother = guest.reservedGiftId != null && !isSelectedByMe;
+                    const canSelect = !isSelectedByMe && !isLimitReached && selectedGiftIds.length < 2;
 
                     return (
                       <div key={gift.id} className={`p-3 rounded-xl border flex flex-col gap-2 ${isSelectedByMe ? 'bg-verde-baby/20 border-verde-baby/60' : isLimitReached ? 'bg-gray-50 border-gray-200/50 opacity-60' : 'bg-white border-lilas-medium/30'}`}>
@@ -457,8 +540,8 @@ export default function AcessoConfirmacao() {
                           ) : isLimitReached ? (
                             <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-400">Esgotado</span>
                           ) : (
-                            <button disabled={isReservedByAnother} onClick={() => handleReserveGift(gift.id)} className="px-3 py-1 rounded-full text-[10px] font-bold bg-rosa-baby text-[#8b4f60] disabled:opacity-40">
-                              Escolher
+                            <button disabled={!canSelect} onClick={() => handleReserveGift(gift.id)} className="px-3 py-1 rounded-full text-[10px] font-bold bg-rosa-baby text-[#8b4f60] disabled:opacity-40">
+                              {selectedGiftIds.length >= 2 ? 'Limite atingido' : 'Escolher'}
                             </button>
                           )}
                         </div>
